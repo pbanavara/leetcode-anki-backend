@@ -17,6 +17,7 @@ def init_database():
 
     c.execute("""CREATE TABLE IF NOT EXISTS user_attempts
                 (id INTEGER PRIMARY KEY,
+                 user_id TEXT NOT NULL,
                  problem_id INTEGER,
                  iterations INTEGER,
                  user_difficulty TEXT,

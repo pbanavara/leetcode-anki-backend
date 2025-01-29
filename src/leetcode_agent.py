@@ -84,18 +84,6 @@ class LeetCodeThinkingAgent:
             messages=[{"role": "user", "content": prompt}],
         )
         return response.content[0].text
-    
-    def is_solution_complete(solution: str) -> bool:
-        # Positive trigger words indicating solution completion
-        completion_triggers = set([
-            "solution is complete",
-            "approach is correct",
-            "logic is sound",
-            "well structured",
-            "handles all cases"
-         ])
-        return solution.lower() in completion_triggers
-
 
     def verify_walkthrough(self, problem: LeetcodeProblem, walkthrough: str) -> str:
         prompt = f"""
@@ -122,20 +110,22 @@ class LeetCodeThinkingAgent:
             return "Medium"
         return "Hard"
 
-    def record_attempt(self, problem_id: int, iterations: int):
+    def record_attempt(self, user_id: str, problem_id: int, iterations: int):
         user_difficulty = self.calculate_difficulty(iterations)
         conn = sqlite3.connect("leetcode_training.db")
         c = conn.cursor()
+        
         leetcode_difficulty = c.execute(
             "SELECT difficulty FROM problems WHERE id = ?", (problem_id,)
         ).fetchone()[0]
-
+        
         c.execute(
             """INSERT INTO user_attempts 
-                    (problem_id, iterations, user_difficulty, 
-                     leetcode_difficulty, timestamp)
-                    VALUES (?, ?, ?, ?, ?)""",
+            (user_id, problem_id, iterations, user_difficulty, 
+            leetcode_difficulty, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?)""",
             (
+                user_id,
                 problem_id,
                 iterations,
                 user_difficulty,
@@ -143,16 +133,52 @@ class LeetCodeThinkingAgent:
                 datetime.now(),
             ),
         )
+        
         conn.commit()
         conn.close()
+        
+        comparison_message = (
+        "✅ Your experience matches LeetCode's rating!"
+        if user_difficulty == leetcode_difficulty
+        else f"📊 Interesting! You found this {user_difficulty.lower()} while LeetCode rates it as {leetcode_difficulty.lower()}")
+    
+        return {
+            "user_difficulty": user_difficulty,
+            "leetcode_difficulty": leetcode_difficulty,
+            "comparison_message": comparison_message
+        }
 
-        print("\n=== Difficulty Comparison ===")
-        print(f"Your Experience: {user_difficulty}")
-        print(f"LeetCode Rating: {leetcode_difficulty}")
-        if user_difficulty == leetcode_difficulty:
-            print("✅ Your experience matches LeetCode's rating!")
-        else:
-            print(
-                f"📊 Interesting! You found this {user_difficulty.lower()} "
-                f"while LeetCode rates it as {leetcode_difficulty.lower()}"
-            )
+    
+
+    def generate_python_solution(self, problem: LeetcodeProblem) -> str:
+        prompt = f"""
+        Problem: {problem.title}
+        Description: {problem.description}
+        
+        Generate a complete, efficient Python solution for this problem.
+        Include:
+        1. Time and space complexity analysis
+        2. Clear variable names and comments
+        3. Edge case handling
+        4. Example test cases
+        
+        Format the response as:
+        ```python
+        # Solution explanation and complexity analysis
+        
+        def solution_function():
+            # Implementation
+        
+        # Test cases
+        ```
+        """
+        
+        response = self.client.messages.create(
+            model="claude-3-opus-20240229",
+            max_tokens=2000,
+            temperature=0.7,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        
+        return response.content
+

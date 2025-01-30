@@ -1,25 +1,30 @@
-from fastapi import Depends, HTTPException
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from fastapi import HTTPException, Depends
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import logging
-
 import requests
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
 
 security = HTTPBearer()
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 def verify_google_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
         token = credentials.credentials
         logger.debug(f"Received access token: {token[:20]}...")
-
-        userinfo_endpoint = "https://www.googleapis.com/oauth2/v3/userinfo"
-        headers = {"Authorization": f"Bearer {token}"}
-        response = requests.get(userinfo_endpoint, headers=headers)
-        userinfo = response.json()
-
-        user_id = userinfo["sub"]
-        logger.debug(f"Verified user ID: {user_id}")
+        
+        # Use Google's tokeninfo endpoint
+        response = requests.get(f'https://oauth2.googleapis.com/tokeninfo?id_token={token}')
+        
+        if response.status_code != 200:
+            raise HTTPException(status_code=401, detail="Invalid token")
+            
+        token_info = response.json()
+        # Extract user ID from token info
+        user_id = token_info.get('sub')
+        logger.debug(f"Verified user email: {user_id}")
         return user_id
 
     except Exception as e:

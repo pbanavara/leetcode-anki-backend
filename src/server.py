@@ -7,6 +7,7 @@ from src.leetcode_agent import LeetCodeThinkingAgent
 from fastapi.middleware.cors import CORSMiddleware
 from src.redis_manager import RedisManager
 from src.auth import verify_google_token
+from urllib.parse import unquote
 
 
 class PseudocodeRequest(BaseModel):
@@ -54,7 +55,7 @@ async def start_practice_session(
         current_problem = existing_problems[current_index]
     else:
         current_problem = existing_problems[current_index]
-        
+
     if existing_problems:
         current_problem = existing_problems[current_index]
     else:
@@ -84,7 +85,7 @@ async def submit_pseudocode(
     pseudocode: PseudocodeRequest,
     user_id: str = Depends(verify_google_token),
 ):
-
+    print(f"Endpoint called with session_id: {session_id}")
     def is_solution_complete(solution: str) -> bool:
         completion_triggers = set(
             [
@@ -97,8 +98,9 @@ async def submit_pseudocode(
         )
         return any(trigger in solution.lower() for trigger in completion_triggers)
 
-
-    if session_id not in active_sessions:
+    decoded_session_id = unquote(session_id)
+    print("Decoded Session ID:", decoded_session_id)
+    if decoded_session_id not in active_sessions:
         raise HTTPException(status_code=404, detail="Session not found")
 
     # Get user's problem set from Redis
